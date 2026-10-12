@@ -2,14 +2,13 @@
 <html lang="id" data-theme="auto">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Ruto AI</title>
 <meta name="description" content="Chatbot BYOK: pakai API key milikmu sendiri. Tanpa server, tanpa akun.">
 <meta name="theme-color" content="#050505">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https: http://localhost:* http://127.0.0.1:*; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
@@ -57,8 +56,8 @@ h1,h2,h3,h4,p{margin:0}
 }
 
 @layer layout{
-#app{display:grid;height:100dvh;min-height:100dvh}
-#main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;height:100dvh}
+#app{display:grid;height:var(--vh,100dvh);min-height:var(--vh,100dvh)}
+#main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;height:var(--vh,100dvh)}
 #scroll{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:112px 16px 24px;scrollbar-width:thin;scrollbar-color:var(--hair) transparent}
 .col{max-width:760px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
 #msgs{flex:1}
@@ -297,10 +296,14 @@ dialog form.sheet>.core{flex:1;display:block}
 #app.locked{opacity:0;visibility:hidden;transition:none}
 .wf{max-width:440px;margin-top:24px}
 .wl .bento{margin:32px 0 8px}
+#mic{position:relative}
+#mic.rec{background:color-mix(in srgb,var(--err) 16%,transparent);color:var(--err)}
+#mic.rec::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 2px var(--err);animation:ring 1.4s var(--ease) infinite;pointer-events:none}
 }
 
 @layer motion{
 @keyframes rise{from{opacity:0;transform:translateY(22px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes ring{from{opacity:.55;transform:scale(.8)}to{opacity:0;transform:scale(1.5)}}
 @keyframes bob{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
 @keyframes toastin{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes toastout{to{opacity:0;transform:translateY(12px) scale(.96)}}
@@ -319,6 +322,7 @@ dialog form.sheet>.core{flex:1;display:block}
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
 <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
@@ -380,6 +384,7 @@ dialog form.sheet>.core{flex:1;display:block}
         <div id="atts"></div>
         <div class="row">
           <button class="ib" id="attach" type="button" aria-label="Lampirkan file atau gambar"><svg class="i"><use href="#i-clip"/></svg></button>
+          <button class="ib" id="mic" type="button" aria-label="Dikte suara jadi teks" aria-pressed="false"><svg class="i"><use href="#i-mic"/></svg></button>
           <textarea id="ta" rows="1" placeholder="Tulis pesan…" aria-label="Pesan"></textarea>
           <button id="send" type="submit" aria-label="Kirim"></button>
         </div>
@@ -714,8 +719,8 @@ list.addEventListener('click',async e=>{
     S.chats=S.chats.filter(z=>z.id!==c.id);if(S.cur===c.id){S.cur=null;renderMsgs(false)}
     renderSide();toast('Percakapan dihapus')}
 });
-function newChat(){stopStream();S.cur=null;S.att=[];renderAtt();renderMsgs(false);renderSide();closeSide();$('#ta').focus({preventScroll:true})}
-function openChat(id){if(S.cur===id){closeSide();return}stopStream();S.cur=id;S.att=[];renderAtt();renderMsgs(true);renderSide();closeSide();renderTop()}
+function newChat(){stopStream();stopMic(true);S.cur=null;S.att=[];renderAtt();renderMsgs(false);renderSide();closeSide();$('#ta').focus({preventScroll:true})}
+function openChat(id){if(S.cur===id){closeSide();return}stopStream();stopMic(true);S.cur=id;S.att=[];renderAtt();renderMsgs(true);renderSide();closeSide();renderTop()}
 $('#newSide').onclick=newChat;$('#newTop').onclick=newChat;
 
 /* ========= Pesan ========= */
@@ -769,7 +774,7 @@ function renderEmpty(force){
     </div>`;
   }else{
     const P=['Jelaskan cara kerja blockchain dengan analogi sederhana','Buatkan email singkat untuk menolak tawaran dengan sopan','Tulis fungsi Python untuk mengecek bilangan prima','Ringkas manfaat tidur cukup dalam 5 poin'];
-    e.innerHTML=`<span class="eyebrow reveal">${esc(am?.name||'Ruto AI')}</span><h1 class="reveal">${S.profile?.name?'Halo, '+esc(S.profile.name)+'.':'Halo.'}</h1><p class="sub reveal">Mau ngobrol apa hari ini? Ketik pesanmu atau lampirkan file.</p>
+    e.innerHTML=`<span class="eyebrow reveal">${esc(am?.name||'Ruto AI')}</span><h1 class="reveal">${S.profile?.name?'Halo, '+esc(S.profile.name)+'.':'Halo.'}</h1><p class="sub reveal">Mau ngobrol apa hari ini? Ketik${SR?', ucapkan lewat mikrofon,':''} atau lampirkan file.</p>
     <div class="chips reveal">${P.map(p=>`<button class="chip" type="button" data-p="${esc(p)}">${ic('spark')}${esc(p)}</button>`).join('')}</div>`;
   }
   observeReveal(e);
@@ -785,7 +790,7 @@ const ta=$('#ta');
 function autosize(){ta.style.height='auto';ta.style.height=Math.min(Math.max(ta.scrollHeight,46),200)+'px'}
 function dimSend(){$('#send').classList.toggle('dim',!S.busy&&!ta.value.trim()&&!S.att.length)}
 function setSendState(){const b=$('#send');b.innerHTML=ic(S.busy?'stop':'send');b.setAttribute('aria-label',S.busy?'Hentikan jawaban':'Kirim');dimSend()}
-ta.addEventListener('input',()=>{autosize();dimSend()});
+ta.addEventListener('input',()=>{if(rec)stopMic(true);autosize();dimSend()});
 ta.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing&&matchMedia('(pointer:fine)').matches){e.preventDefault();send()}});
 ta.addEventListener('paste',e=>{const f=[...(e.clipboardData?.files||[])].filter(x=>x.type.startsWith('image/'));if(f.length){e.preventDefault();addFiles(f)}});
 $('#comp').addEventListener('submit',e=>{e.preventDefault();S.busy?stopStream():send()});
@@ -808,6 +813,28 @@ function renderAtt(){
   $('#atts').innerHTML=S.att.map((a,i)=>`<span class="attchip">${ic(a.kind==='img'?'spark':'file')}<span>${esc(a.name)}</span><button type="button" data-rm="${i}" aria-label="Hapus lampiran">${ic('x')}</button></span>`).join('');dimSend();
 }
 $('#atts').addEventListener('click',e=>{const b=e.target.closest('[data-rm]');if(b){S.att.splice(+b.dataset.rm,1);renderAtt()}});
+
+/* Dikte: suara -> teks (Web Speech API; tombol disembunyikan bila browser tidak mendukung) */
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+let rec=null;
+function micUi(on){const b=$('#mic');b.classList.toggle('rec',on);b.setAttribute('aria-pressed',on);b.setAttribute('aria-label',on?'Berhenti merekam':'Dikte suara jadi teks');ta.placeholder=on?'Mendengarkan… silakan bicara':'Tulis pesan…'}
+function startMic(){
+  if(!SR)return;
+  if(!window.isSecureContext){toast('Dikte butuh halaman aman. Buka lewat https:// atau file:/// di Chrome, bukan dari file manager.','err');return}
+  const r=new SR(),base=ta.value?ta.value.replace(/\s*$/,' '):'';
+  r.lang='id-ID';r.interimResults=true;r.continuous=true;rec=r;
+  r.onresult=e=>{if(r._dead)return;const t=[...e.results].map(x=>x[0].transcript.trim()).filter(Boolean).join(' ');ta.value=base+t;autosize();dimSend()};
+  r.onerror=ev=>{
+    const m={'not-allowed':'Izin mikrofon ditolak. Izinkan mikrofon di pengaturan browser.','service-not-allowed':'Izin mikrofon ditolak. Izinkan mikrofon di pengaturan browser.','audio-capture':'Mikrofon tidak ditemukan.','network':'Dikte butuh koneksi internet.','language-not-supported':'Bahasa dikte tidak didukung browser ini.'}[ev.error];
+    if(m)toast(m,'err');else if(ev.error!=='no-speech'&&ev.error!=='aborted')toast('Dikte gagal. Coba lagi.','err')};
+  r.onend=()=>{if(rec===r)rec=null;if(!rec)micUi(false)};
+  try{r.start();micUi(true)}catch{rec=null;micUi(false);toast('Dikte tidak bisa dimulai','err')}
+}
+function stopMic(abort){
+  const r=rec;if(!r)return;
+  if(abort){r._dead=true;rec=null;micUi(false);try{r.abort()}catch{}}else{try{r.stop()}catch{}}
+}
+$('#mic').onclick=()=>rec?stopMic(false):startMic();
 
 /* ========= Jaringan: streaming ========= */
 function parts(m){
@@ -879,24 +906,13 @@ function friendly(e){
   return e.message||'Terjadi kesalahan tak dikenal.';
 }
 
-/* ========= Bahasa jawaban AI: otomatis ikut HP, bisa dipilih manual ========= */
-const AIL=[['id','Bahasa Indonesia'],['en','English'],['ms','Bahasa Melayu'],['jv','Basa Jawa'],['ar','العربية'],['zh','中文'],['ja','日本語'],['ko','한국어'],['es','Español'],['fr','Français'],['de','Deutsch']];
-function aiLang(){
-  const pref=ls.g('ailang','auto'),list=navigator.languages&&navigator.languages.length?[...navigator.languages]:[navigator.language||'id-ID'];
-  /* Otomatis: bila Bahasa Indonesia ada di daftar bahasa HP, pakai itu; selain itu bahasa pertama */
-  const code=pref!=='auto'?pref:(list.find(l=>/^id\b/i.test(l))||list[0]),base=code.split('-')[0].toLowerCase();
-  const nm=(loc,c)=>{try{return new Intl.DisplayNames([loc],{type:'language'}).of(c)||null}catch{return null}};
-  const en=nm('en',base)||base,idn=nm('id',base)||en;
-  return{pref,base,detected:list.join(', '),label:base==='id'?'Bahasa Indonesia':'Bahasa '+idn,
-    rule:`IMPORTANT: Always reply in ${en}. Use ${en} even for short or ambiguous messages such as greetings. Only switch language if the user explicitly asks you to.`};
-}
-
 /* ========= Alur chat ========= */
 function stopStream(){
   if(!S.ctl)return;S.ctl.abort();S.ctl=null;S.busy=false;S.run=null;setSendState();
 }
 async function send(){
   if(S.busy){toast('Tunggu jawaban selesai atau tekan Stop');return}
+  stopMic(true);
   const text=ta.value.trim();
   if(!text&&!S.att.length){shake($('#comp .bz'));ta.focus();return}
   const m=activeModel();
@@ -928,7 +944,7 @@ async function run(c){
   try{
     const apiKey=await decT(VK,key.ct);
     const hist=c.messages.filter(x=>x!==am&&!x.error&&(x.role==='user'||x.content));
-    await stream({provider:key.provider,base:key.baseUrl,key:apiKey,modelId:model.modelId,system:[aiLang().rule,model.system].filter(Boolean).join('\n\n')},hist,t=>{
+    await stream({provider:key.provider,base:key.baseUrl,key:apiKey,modelId:model.modelId,system:model.system},hist,t=>{
       if(firstT){firstT=false;el.classList.remove('typing');}
       am.content+=t;if(!raf)raf=requestAnimationFrame(tick)},S.ctl.signal);
     if(!am.content)throw new Error('Model tidak mengembalikan jawaban.');
@@ -1034,12 +1050,12 @@ function openSettings(){S.reveal.clear();S.plain={};renderSettings();D.open($('#
 $('#setTop').onclick=openSettings;
 $('#dSet').addEventListener('close',()=>{S.reveal.clear();S.plain={}});
 function renderSettings(){
-  const body=$('#setBody'),top=body.closest('.core')?.scrollTop||0,th=ls.g('theme','auto'),pin=V?.mode==='pin',al=aiLang();
+  const body=$('#setBody'),top=body.closest('.core')?.scrollTop||0,th=ls.g('theme','auto'),pin=V?.mode==='pin';
   const seg=[['auto','Otomatis'],['light','Terang'],['dark','Gelap']].map(([v,n])=>`<button type="button" data-act="theme" data-v="${v}" aria-pressed="${th===v}">${n}</button>`).join('');
   const keys=S.keys.length?S.keys.map(k=>`<div class="row"><div class="rt"><b>${esc(PROV[k.provider].n)}</b><small class="mono">${S.reveal.has(k.id)?esc(S.plain[k.id]||''):esc(k.mask)}</small></div><div class="ra"><button class="ib sm" type="button" data-act="key-eye" data-id="${k.id}" aria-label="Tampilkan atau sembunyikan key">${ic(S.reveal.has(k.id)?'eyeoff':'eye')}</button><button class="ib sm" type="button" data-act="key-edit" data-id="${k.id}" aria-label="Ubah key">${ic('pencil')}</button><button class="ib sm" type="button" data-act="key-del" data-id="${k.id}" aria-label="Hapus key">${ic('trash')}</button></div></div>`).join(''):'<p class="none">Belum ada API key.</p>';
   const mods=S.models.length?S.models.map(m=>{const k=S.keys.find(x=>x.id===m.keyId);return`<div class="row"><div class="rt"><b>${esc(m.name)}</b><small class="mono">${esc(m.modelId)} · ${esc(k?PROV[k.provider].n:'-')}</small></div><div class="ra"><button class="ib sm" type="button" data-act="model-edit" data-id="${m.id}" aria-label="Ubah model">${ic('pencil')}</button><button class="ib sm" type="button" data-act="model-del" data-id="${m.id}" aria-label="Hapus model">${ic('trash')}</button></div></div>`}).join(''):'<p class="none">Belum ada model.</p>';
   body.innerHTML=`
-  <div class="bz sec"><div class="core"><h3>Tampilan</h3><p class="hint">Tema mengikuti perangkat secara default.</p><div class="seg" role="group" aria-label="Tema">${seg}</div><label class="f" style="margin:18px 0 8px"><span>Bahasa jawaban AI</span><select class="in" id="ailang"><option value="auto"${al.pref==='auto'?' selected':''}>Otomatis (ikut HP)</option>${AIL.map(([v,n])=>`<option value="${v}"${al.pref===v?' selected':''}>${n}</option>`).join('')}</select></label><p class="hint">${al.pref==='auto'?`Terdeteksi dari HP: <b>${esc(al.label)}</b> (${esc(al.detected)}).`:`AI selalu menjawab dalam <b>${esc(al.label)}</b>.`}</p></div></div>
+  <div class="bz sec"><div class="core"><h3>Tampilan</h3><p class="hint">Tema mengikuti perangkat secara default.</p><div class="seg" role="group" aria-label="Tema">${seg}</div></div></div>
   <div class="bz sec"><div class="core"><h3>API key</h3><p class="hint">Tersimpan terenkripsi (AES-GCM) di perangkat ini dan hanya dikirim ke penyedia yang kamu pilih.</p>${keys}<div class="btns"><button class="btn sm" type="button" data-act="key-add"><span>Tambah key</span><span class="ic">${ic('plus')}</span></button></div></div></div>
   <div class="bz sec"><div class="core"><h3>Model</h3><p class="hint">Nama tampilan ini muncul di pemilih model pada layar chat.</p>${mods}<div class="btns"><button class="btn sm" type="button" data-act="model-add"><span>Tambah model</span><span class="ic">${ic('plus')}</span></button></div></div></div>
   <div class="bz sec"><div class="core"><h3>Akun</h3><p class="hint">Masuk sebagai <b>${esc(S.profile?.name||'')}</b>. Sandi mengunci API key di perangkat ini. Jika lupa sandi, key tidak bisa dipulihkan, jadi simpan cadangan ekspor.</p>
@@ -1048,9 +1064,6 @@ function renderSettings(){
     <div class="btns"><button class="btn sm g" type="button" data-act="export"><span>Ekspor cadangan</span><span class="ic">${ic('download')}</span></button><button class="btn sm g" type="button" data-act="import"><span>Impor cadangan</span><span class="ic">${ic('upload')}</span></button><button class="btn sm danger" type="button" data-act="wipe"><span>Hapus semua data</span><span class="ic">${ic('trash')}</span></button></div></div></div>`;
   const core=body.closest('.core');if(core)core.scrollTop=top;
 }
-$('#setBody').addEventListener('change',e=>{
-  if(e.target.id==='ailang'){ls.s('ailang',e.target.value);renderSettings();toast('Jawaban AI: '+aiLang().label,'ok')}
-});
 $('#setBody').addEventListener('click',async e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,id=b.dataset.id;
   if(a==='theme'){ls.s('theme',b.dataset.v);applyTheme();renderSettings()}
@@ -1205,13 +1218,14 @@ $('#fAcct').addEventListener('submit',async e=>{
   }catch(e){console.error(e);err('Terjadi kesalahan: '+String(e?.message||e).slice(0,90))}finally{btn.disabled=false;$('#wGoT').textContent=wMode==='login'?'Masuk':'Buat akun'}
 });
 function logout(){
-  stopStream();D.close($('#dSet'));VK=null;S.reveal.clear();S.plain={};S.cur=null;S.att=[];msgs.textContent='';closeSide();closeMenu();
+  stopStream();stopMic(true);D.close($('#dSet'));VK=null;S.reveal.clear();S.plain={};S.cur=null;S.att=[];msgs.textContent='';closeSide();closeMenu();
   setTimeout(()=>showWelcome('login'),380);
 }
 
 /* ========= Boot ========= */
 async function boot(){
   applyTheme();fillProv();kProvChange();setSendState();
+  if(!SR)$('#mic').hidden=true;
   try{await DB.open()}catch{
     document.body.insertAdjacentHTML('beforeend','<p style="position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;z-index:99;background:var(--bg)">Penyimpanan browser (IndexedDB) tidak tersedia. Nonaktifkan mode privat atau gunakan browser lain.</p>');return}
   try{
@@ -1226,6 +1240,14 @@ async function boot(){
   if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 boot();
+(function(){
+  const vv=window.visualViewport;if(!vv)return;
+  const set=()=>{
+    document.documentElement.style.setProperty('--vh',vv.height+'px');
+    if(vv.offsetTop)window.scrollTo(0,0);
+  };
+  vv.addEventListener('resize',set);vv.addEventListener('scroll',set);set();
+})();
 </script>
 </body>
 </html>
